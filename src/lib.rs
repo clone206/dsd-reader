@@ -1,20 +1,14 @@
-/*
- Copyright (c) 2023 clone206
-
- This file is part of dsd-reader
-
- dsd-reader is free software: you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the
- Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
-
- dsd-reader is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- GNU General Public License for more details.
- You should have received a copy of the GNU General Public License
- along with dsd-reader. If not, see <https://www.gnu.org/licenses/>.
-*/
+//! A library for reading DSD audio data. Allows for reading from standard in ("stdin"), 
+//! DSD container files (e.g. DSF or DFF), and raw DSD files, which are assumed to contain 
+//! no metadata. For reading stdin or raw DSD files, the library relies on certain input 
+//! parameters to interpret the format of the DSD data.
+//! 
+//! Provides an iterator over the frames of the DSD data, which is basically a vector 
+//! of channels in planar format, with a `block_size` slice for each channel in least 
+//! significant bit first order. Channels are ordered by number (ch1,ch2,...). 
+//! This planar format was chosen due to the prevalence of DSF files and the efficiency 
+//! with which it can be iterated over and processed in certain scenarios, 
+//! however it should be trivial for the implementor to convert to interleaved format if needed.
 
 mod dsd_file;
 use crate::dsd_file::{
@@ -387,7 +381,7 @@ impl DsdReader {
     }
 }
 
-/// DSD data iterator that yields frames of DSD data. Used by [DsdReader].
+/// DSD data iterator that yields frames of DSD data. Provided by [DsdReader].
 pub struct DsdIter {
     std_in: bool,
     bytes_remaining: u64,
