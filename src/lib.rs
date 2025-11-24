@@ -10,7 +10,7 @@
 //! with which it can be iterated over and processed in certain scenarios, 
 //! however it should be trivial for the implementor to convert to interleaved format if needed.
 
-mod dsd_file;
+pub mod dsd_file;
 use crate::dsd_file::{
     DFF_BLOCK_SIZE, DSD_64_RATE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions,
 };
