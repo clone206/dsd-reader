@@ -1,0 +1,21 @@
+[package]
+name = "dsd-reader"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "A Rust library for reading DSD (Direct Stream Digital) audio data from DSF, DFF, or raw sources."
+readme = "README.md"
+repository = "https://github.com/clone206/dsd-reader"
+keywords = ["audio", "dsd", "dsf", "dff", "decoder"]
+categories = ["multimedia", "parsing"]
+# If publishing to crates.io, ensure categories & keywords are valid.
+
+[lib]
+name = "dsd_reader"
+path = "src/lib.rs"
+
+[dependencies]
+dsf-meta = "0.2.5"
+dff-meta = "0.1.2"
+log = { version = "0.4.28", features = ["std"] }
+id3 = "1.16.3"
