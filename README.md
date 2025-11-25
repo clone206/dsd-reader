@@ -11,6 +11,8 @@ This planar format was chosen due to the prevalence of DSF files and the efficie
 with which it can be iterated over and processed in certain scenarios, 
 however it should be trivial for the implementer to convert to interleaved format if needed.
 
+For an example of a binary that uses this library, see [dsd2dxd](https://github.com/clone206/dsd2dxd).
+
 ## Examples
 
 Opening and reading a DFF file:
