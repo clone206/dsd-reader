@@ -88,9 +88,7 @@
 //!         "read_size: usize is {} bytes. Not guaranteed to have filled buffers.", 
 //!         read_size
 //!     );
-//!     for chan in 0..channels_num {
-//!         my_process_channel(chan, &chan_bufs[chan]);
-//!     }
+//!     my_process_channel(0, &chan_bufs[0]);
 //! }
 //! 
 //! fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
