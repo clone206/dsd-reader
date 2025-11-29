@@ -21,7 +21,7 @@
 //! let in_path = PathBuf::from("my/music.dff");
 //! // Constructor for use with container files. DSF works the same
 //! let dsd_reader = DsdReader::from_container(in_path.clone()).unwrap();
-//! let channels_num = dsd_reader.channels_num() as usize;
+//! let channels_num = dsd_reader.channels_num();
 //! let dsd_iter = dsd_reader.dsd_iter().unwrap();
 //! 
 //! for (read_size, chan_bufs) in dsd_iter {
@@ -49,7 +49,7 @@
 //!     4096, // A safe choice of block size for all DSD inputs
 //!     2 // Stereo
 //! ).unwrap();
-//! let channels_num = dsd_reader.channels_num() as usize;
+//! let channels_num = dsd_reader.channels_num();
 //! let dsd_iter = dsd_reader.dsd_iter().unwrap();
 //! 
 //! for (read_size, chan_bufs) in dsd_iter {
@@ -80,7 +80,7 @@
 //!     4096, // A safe choice of block size for all DSD inputs
 //!     1 // Mono
 //! ).unwrap();
-//! let channels_num = dsd_reader.channels_num() as usize;
+//! let channels_num = dsd_reader.channels_num();
 //! let dsd_iter = dsd_reader.dsd_iter().unwrap();
 //! 
 //! for (read_size, chan_bufs) in dsd_iter {
@@ -501,7 +501,7 @@ impl DsdIter {
             frame_size: 0,
             interleaved: dsd_input.interleaved,
             lsbit_first: dsd_input.lsbit_first,
-            dsd_data: vec![0; dsd_input.block_size as usize * dsd_input.channels_num as usize],
+            dsd_data: vec![0; dsd_input.block_size as usize * dsd_input.channels_num],
             file: if let Some(file) = &dsd_input.file {
                 Some(file.try_clone()?)
             } else {
@@ -532,7 +532,7 @@ impl DsdIter {
             self.reader
                 .read_exact(&mut self.dsd_data[..self.frame_size as usize])?;
             // Copy interleaved data into channel buffers
-            for chan in 0..self.channels_num as usize {
+            for chan in 0..self.channels_num {
                 let chan_bytes = self.get_chan_bytes_interl(chan, self.frame_size as usize);
                 self.channel_buffers[chan].copy_from_slice(&chan_bytes);
             }
@@ -550,7 +550,7 @@ impl DsdIter {
             let valid_for_chan = (remaining / self.channels_num as u64) as usize;
             let padding = self.block_size as usize - valid_for_chan;
 
-            for chan in 0..self.channels_num as usize {
+            for chan in 0..self.channels_num {
                 let chan_buf = &mut self.channel_buffers[chan];
 
                 self.reader.read_exact(&mut chan_buf[..valid_for_chan])?;
@@ -572,11 +572,11 @@ impl DsdIter {
     /// channel with the endianness we need.
     #[inline(always)]
     fn get_chan_bytes_interl(&self, chan: usize, read_size: usize) -> Vec<u8> {
-        let chan_size = read_size / self.channels_num as usize;
+        let chan_size = read_size / self.channels_num;
         let mut chan_bytes: Vec<u8> = Vec::with_capacity(chan_size);
 
         for i in 0..chan_size {
-            let byte_index = chan + i * self.channels_num as usize;
+            let byte_index = chan + i * self.channels_num;
             if byte_index >= self.dsd_data.len() {
                 break;
             }
@@ -594,7 +594,7 @@ impl DsdIter {
         self.block_size = block_size;
         self.frame_size = self.block_size * self.channels_num as u32;
 
-        self.channel_buffers = (0..self.channels_num as usize)
+        self.channel_buffers = (0..self.channels_num)
             .map(|_| vec![0x69u8; self.block_size as usize].into_boxed_slice())
             .collect();
 
@@ -602,7 +602,7 @@ impl DsdIter {
     }
 
     fn reset_buffers(&mut self) {
-        for chan in 0..self.channels_num as usize {
+        for chan in 0..self.channels_num {
             let chan_buf = &mut self.channel_buffers[chan];
             for byte in chan_buf.iter_mut() {
                 *byte = 0x69;
