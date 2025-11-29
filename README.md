@@ -23,7 +23,7 @@ use dsd_reader::DsdReader;
 let in_path = PathBuf::from("my/music.dff");
 // Constructor for use with container files. DSF works the same
 let dsd_reader = DsdReader::from_container(in_path.clone()).unwrap();
-let channels_num = dsd_reader.channels_num() as usize;
+let channels_num = dsd_reader.channels_num();
 let dsd_iter = dsd_reader.dsd_iter().unwrap();
 
 for (read_size, chan_bufs) in dsd_iter {
@@ -51,7 +51,7 @@ let dsd_reader = DsdReader::new(
     4096, // A safe choice of block size for all DSD inputs
     2 // Stereo
 ).unwrap();
-let channels_num = dsd_reader.channels_num() as usize;
+let channels_num = dsd_reader.channels_num();
 let dsd_iter = dsd_reader.dsd_iter().unwrap();
 
 for (read_size, chan_bufs) in dsd_iter {
@@ -82,7 +82,7 @@ let dsd_reader = DsdReader::new(
     4096, // A safe choice of block size for all DSD inputs
     1 // Mono
 ).unwrap();
-let channels_num = dsd_reader.channels_num() as usize;
+let channels_num = dsd_reader.channels_num();
 let dsd_iter = dsd_reader.dsd_iter().unwrap();
 
 for (read_size, chan_bufs) in dsd_iter {

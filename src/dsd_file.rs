@@ -47,7 +47,7 @@ pub const DSF_BLOCK_SIZE: u32 = 4096;
 pub struct DsdFile {
     audio_length: u64,
     audio_pos: u64,
-    channel_count: Option<u32>,
+    channel_count: Option<usize>,
     is_lsb: Option<bool>,
     block_size: Option<u32>,
     sample_rate: Option<u32>,
@@ -69,7 +69,7 @@ impl DsdFile {
     pub fn audio_pos(&self) -> u64 {
         self.audio_pos
     }
-    pub fn channel_count(&self) -> Option<u32> {
+    pub fn channel_count(&self) -> Option<usize> {
         self.channel_count
     }
     pub fn is_lsb(&self) -> Option<bool> {
@@ -106,7 +106,7 @@ impl DsdFile {
                 ),
                 container_format: DsdFileFormat::Dsf,
                 channel_count: Some(
-                    dsf_file.fmt_chunk().channel_num() as u32
+                    dsf_file.fmt_chunk().channel_num() as usize,
                 ),
                 is_lsb: Some(dsf_file.fmt_chunk().bits_per_sample() == 1),
                 block_size: Some(DSF_BLOCK_SIZE), // Should always be this value for DSF
@@ -137,7 +137,7 @@ impl DsdFile {
             Ok(Self {
                 sample_rate: Some(dff_file.get_sample_rate()?),
                 container_format: DsdFileFormat::Dsdiff,
-                channel_count: Some(dff_file.get_num_channels()? as u32),
+                channel_count: Some(dff_file.get_num_channels()?),
                 is_lsb: Some(false),
                 block_size: Some(DFF_BLOCK_SIZE), // Should always be 1 for DFF
                 audio_length: dff_file.get_audio_length(),

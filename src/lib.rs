@@ -159,7 +159,7 @@ struct InputPathAttrs {
 /// DSD input context for reading DSD audio data from various sources.
 pub struct DsdReader {
     dsd_rate: DsdRate,
-    channels_num: u32,
+    channels_num: usize,
     std_in: bool,
     tag: Option<id3::Tag>,
     file_name: OsString,
@@ -198,7 +198,7 @@ impl DsdReader {
     pub fn dsd_rate(&self) -> i32 {
         self.dsd_rate as i32
     }
-    pub fn channels_num(&self) -> u32 {
+    pub fn channels_num(&self) -> usize {
         self.channels_num
     }
     pub fn std_in(&self) -> bool {
@@ -241,7 +241,7 @@ impl DsdReader {
         endianness: Endianness,
         dsd_rate: DsdRate,
         block_size: u32,
-        channels: u32,
+        channels: usize,
     ) -> Result<Self, Box<dyn Error>> {
         let lsbit_first = match endianness {
             Endianness::LsbFirst => true,
@@ -473,7 +473,7 @@ impl DsdReader {
 pub struct DsdIter {
     std_in: bool,
     bytes_remaining: u64,
-    channels_num: u32,
+    channels_num: usize,
     channel_buffers: Vec<Box<[u8]>>,
     block_size: u32,
     reader: Box<dyn Read + Send>,
@@ -527,7 +527,7 @@ impl DsdIter {
 
         if self.interleaved {
             if partial_frame {
-                self.set_block_size(self.bytes_remaining as u32 / self.channels_num);
+                self.set_block_size((self.bytes_remaining / self.channels_num as u64) as u32);
             }
             self.reader
                 .read_exact(&mut self.dsd_data[..self.frame_size as usize])?;
@@ -592,7 +592,7 @@ impl DsdIter {
 
     fn set_block_size(&mut self, block_size: u32) {
         self.block_size = block_size;
-        self.frame_size = self.block_size * self.channels_num;
+        self.frame_size = self.block_size * self.channels_num as u32;
 
         self.channel_buffers = (0..self.channels_num as usize)
             .map(|_| vec![0x69u8; self.block_size as usize].into_boxed_slice())
