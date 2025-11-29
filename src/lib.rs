@@ -32,7 +32,7 @@
 //! }
 //! 
 //! fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
-//!     eprintln!("Processing channel {} with {} bytes.", chan + 1, chan_bytes.len());
+//!     eprintln!("Processing channel {} with {} bytes. Not guaranteed to have filled buffers.", chan + 1, chan_bytes.len());
 //!     // do stuff
 //! }
 //! ```
@@ -60,7 +60,7 @@
 //! }
 //! 
 //! fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
-//!     eprintln!("Processing channel {} with {} bytes.", chan + 1, chan_bytes.len());
+//!     eprintln!("Processing channel {} with {} bytes. Not guaranteed to have filled buffers.", chan + 1, chan_bytes.len());
 //!     // do stuff
 //! }
 //! ```
