@@ -161,7 +161,7 @@ impl DsdFile {
                 tag: None,
             })
         } else {
-            Err("Unsupported file extension; only dsf, dff, and raw dsd are supported"
+            Err("Unsupported file type; only dsf, dff, and raw dsd files are supported"
                 .into())
         }
     }
