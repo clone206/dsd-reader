@@ -1,46 +1,46 @@
-//! A library for reading DSD audio data. Allows for reading from standard in ("stdin"), 
-//! DSD container files (e.g. DSF or DFF), and raw DSD files, which are assumed to contain 
-//! no metadata. For reading stdin or raw DSD files, the library relies on certain input 
+//! A library for reading DSD audio data. Allows for reading from standard in ("stdin"),
+//! DSD container files (e.g. DSF or DFF), and raw DSD files, which are assumed to contain
+//! no metadata. For reading stdin or raw DSD files, the library relies on certain input
 //! parameters to interpret the format of the DSD data.
-//! 
-//! Provides an iterator over the frames of the DSD data, which is basically a vector 
-//! of channels in planar format, with a `block_size` slice for each channel in least 
-//! significant bit first order. Channels are ordered by number (ch1,ch2,...). 
-//! This planar format was chosen due to the prevalence of DSF files and the efficiency 
-//! with which it can be iterated over and processed in certain scenarios, 
+//!
+//! Provides an iterator over the frames of the DSD data, which is basically a vector
+//! of channels in planar format, with a `block_size` slice for each channel in least
+//! significant bit first order. Channels are ordered by number (ch1,ch2,...).
+//! This planar format was chosen due to the prevalence of DSF files and the efficiency
+//! with which it can be iterated over and processed in certain scenarios,
 //! however it should be trivial for the implementor to convert to interleaved format if needed.
 //!
 //! ## Examples
-//! 
+//!
 //! Opening and reading a DFF file:
-//! 
+//!
 //!```no_run
 //! use std::path::PathBuf;
 //! use dsd_reader::DsdReader;
-//! 
+//!
 //! let in_path = PathBuf::from("my/music.dff");
 //! // Constructor for use with container files. DSF works the same
 //! let dsd_reader = DsdReader::from_container(in_path.clone()).unwrap();
 //! let channels_num = dsd_reader.channels_num();
 //! let dsd_iter = dsd_reader.dsd_iter().unwrap();
-//! 
+//!
 //! for (read_size, chan_bufs) in dsd_iter {
 //!     eprintln!("read_size: usize is {} bytes.", read_size);
 //!     for chan in 0..channels_num {
 //!         my_process_channel(chan, &chan_bufs[chan]);
 //!     }
 //! }
-//! 
+//!
 //! fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 //!     eprintln!("Processing channel {} with {} bytes. Not guaranteed to have filled buffers.", chan + 1, chan_bytes.len());
 //!     // do stuff
 //! }
 //! ```
-//! 
+//!
 //! Reading from stdin:
 //!```no_run
 //! use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
-//! 
+//!
 //! let dsd_reader = DsdReader::new(
 //!     None, // in_path: None triggers stdin reading
 //!     FmtType::Interleaved,
@@ -51,27 +51,27 @@
 //! ).unwrap();
 //! let channels_num = dsd_reader.channels_num();
 //! let dsd_iter = dsd_reader.dsd_iter().unwrap();
-//! 
+//!
 //! for (read_size, chan_bufs) in dsd_iter {
 //!     eprintln!("read_size: usize is {} bytes.", read_size);
 //!     for chan in 0..channels_num {
 //!         my_process_channel(chan, &chan_bufs[chan]);
 //!     }
 //! }
-//! 
+//!
 //! fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 //!     eprintln!("Processing channel {} with {} bytes. Not guaranteed to have filled buffers.", chan + 1, chan_bytes.len());
 //!     // do stuff
 //! }
 //! ```
-//! 
+//!
 //! Reading from raw dsd file (no metadata contained within):
 //!```no_run
 //! use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 //! use std::path::PathBuf;
-//! 
+//!
 //! let in_path = PathBuf::from("my/raw_audio.dsd");
-//! 
+//!
 //! let dsd_reader = DsdReader::new(
 //!     Some(in_path.clone()),
 //!     FmtType::Planar,
@@ -82,25 +82,25 @@
 //! ).unwrap();
 //! let channels_num = dsd_reader.channels_num();
 //! let dsd_iter = dsd_reader.dsd_iter().unwrap();
-//! 
+//!
 //! for (read_size, chan_bufs) in dsd_iter {
 //!     eprintln!(
-//!         "read_size: usize is {} bytes. Not guaranteed to have filled buffers.", 
+//!         "read_size: usize is {} bytes. Not guaranteed to have filled buffers.",
 //!         read_size
 //!     );
 //!     my_process_channel(0, &chan_bufs[0]);
 //! }
-//! 
+//!
 //! fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 //!     eprintln!("Processing channel {} with {} bytes.", chan + 1, chan_bytes.len());
 //!     // do stuff
 //! }
 //! ```
 
-
 pub mod dsd_file;
 use crate::dsd_file::{
-    DFF_BLOCK_SIZE, DSD_64_RATE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions,
+    DFF_BLOCK_SIZE, DSD_64_RATE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat,
+    FormatExtensions,
 };
 use log::{debug, error, info, warn};
 use std::convert::{TryFrom, TryInto};
@@ -285,19 +285,27 @@ impl DsdReader {
     }
 
     /// Construct DsdReader from container file input (e.g. DSF, DFF)
-    pub fn from_container(in_path: PathBuf) -> Result<Self, Box<dyn Error>> {
+    pub fn from_container(
+        in_path: PathBuf,
+    ) -> Result<Self, Box<dyn Error>> {
         if in_path.is_dir() {
             return Err("Input path cannot be a directory".into());
         }
         let file_format = DsdFileFormat::from(&in_path);
-        if !file_format.is_container() {
-            return Err("Input file is not a recognized container format".into());
-        }
-        let parent_path = Some(in_path.parent().unwrap_or(Path::new("")).to_path_buf());
         let file_name = in_path
             .file_name()
             .unwrap_or_else(|| "stdin".as_ref())
             .to_os_string();
+        if !file_format.is_container() {
+            let name = file_name.to_string_lossy();
+            return Err(format!(
+                "{name} is not a recognized container format ({:?})",
+                file_format
+            )
+            .into());
+        }
+        let parent_path =
+            Some(in_path.parent().unwrap_or(Path::new("")).to_path_buf());
 
         let mut ctx = Self::default();
         ctx.in_path = Some(in_path);
@@ -318,13 +326,16 @@ impl DsdReader {
         DsdIter::new(self)
     }
 
-    fn get_path_attrs(path: &Option<PathBuf>) -> Result<InputPathAttrs, Box<dyn Error>> {
+    fn get_path_attrs(
+        path: &Option<PathBuf>,
+    ) -> Result<InputPathAttrs, Box<dyn Error>> {
         if let Some(p) = path {
             if p.is_dir() {
                 return Err("Input path cannot be a directory".into());
             }
             let file_format = Some(DsdFileFormat::from(p));
-            let parent_path = Some(p.parent().unwrap_or(Path::new("")).to_path_buf());
+            let parent_path =
+                Some(p.parent().unwrap_or(Path::new("")).to_path_buf());
             let file_name = p
                 .file_name()
                 .unwrap_or_else(|| "stdin".as_ref())
@@ -397,7 +408,8 @@ impl DsdReader {
                 self.audio_pos = my_dsd.audio_pos();
                 // Clamp audio_length to what the file can actually contain
                 let max_len: u64 = (file_len - self.audio_pos).max(0);
-                self.audio_length = if my_dsd.audio_length() > 0 && my_dsd.audio_length() <= max_len
+                self.audio_length = if my_dsd.audio_length() > 0
+                    && my_dsd.audio_length() <= max_len
                 {
                     my_dsd.audio_length()
                 } else {
@@ -438,7 +450,8 @@ impl DsdReader {
                 // DSD rate from container sample_rate if valid (2.8224MHz → 1, 5.6448MHz → 2)
                 if let Some(sample_rate) = my_dsd.sample_rate() {
                     if sample_rate % DSD_64_RATE == 0 {
-                        self.dsd_rate = (sample_rate / DSD_64_RATE).try_into()?;
+                        self.dsd_rate =
+                            (sample_rate / DSD_64_RATE).try_into()?;
                     } else {
                         // Fallback: keep CLI value (avoid triggering “Invalid DSD rate”)
                         info!(
@@ -501,7 +514,11 @@ impl DsdIter {
             frame_size: 0,
             interleaved: dsd_input.interleaved,
             lsbit_first: dsd_input.lsbit_first,
-            dsd_data: vec![0; dsd_input.block_size as usize * dsd_input.channels_num],
+            dsd_data: vec![
+                0;
+                dsd_input.block_size as usize
+                    * dsd_input.channels_num
+            ],
             file: if let Some(file) = &dsd_input.file {
                 Some(file.try_clone()?)
             } else {
@@ -519,7 +536,10 @@ impl DsdIter {
     #[inline(always)]
     pub fn load_frame(&mut self) -> Result<usize, Box<dyn Error>> {
         //stdin always reads frame_size
-        let partial_frame = if self.bytes_remaining < self.frame_size as u64 && !self.std_in {
+        let partial_frame = if self.bytes_remaining
+            < self.frame_size as u64
+            && !self.std_in
+        {
             true
         } else {
             false
@@ -527,13 +547,18 @@ impl DsdIter {
 
         if self.interleaved {
             if partial_frame {
-                self.set_block_size((self.bytes_remaining / self.channels_num as u64) as u32);
+                self.set_block_size(
+                    (self.bytes_remaining / self.channels_num as u64)
+                        as u32,
+                );
             }
-            self.reader
-                .read_exact(&mut self.dsd_data[..self.frame_size as usize])?;
+            self.reader.read_exact(
+                &mut self.dsd_data[..self.frame_size as usize],
+            )?;
             // Copy interleaved data into channel buffers
             for chan in 0..self.channels_num {
-                let chan_bytes = self.get_chan_bytes_interl(chan, self.frame_size as usize);
+                let chan_bytes = self
+                    .get_chan_bytes_interl(chan, self.frame_size as usize);
                 self.channel_buffers[chan].copy_from_slice(&chan_bytes);
             }
             Ok(self.frame_size as usize)
@@ -547,7 +572,8 @@ impl DsdIter {
             } else {
                 self.frame_size as u64
             };
-            let valid_for_chan = (remaining / self.channels_num as u64) as usize;
+            let valid_for_chan =
+                (remaining / self.channels_num as u64) as usize;
             let padding = self.block_size as usize - valid_for_chan;
 
             for chan in 0..self.channels_num {
@@ -571,7 +597,11 @@ impl DsdIter {
     /// Take frame of interleaved DSD bytes from internal buffer and return one
     /// channel with the endianness we need.
     #[inline(always)]
-    fn get_chan_bytes_interl(&self, chan: usize, read_size: usize) -> Vec<u8> {
+    fn get_chan_bytes_interl(
+        &self,
+        chan: usize,
+        read_size: usize,
+    ) -> Vec<u8> {
         let chan_size = read_size / self.channels_num;
         let mut chan_bytes: Vec<u8> = Vec::with_capacity(chan_size);
 
@@ -595,7 +625,9 @@ impl DsdIter {
         self.frame_size = self.block_size * self.channels_num as u32;
 
         self.channel_buffers = (0..self.channels_num)
-            .map(|_| vec![0x69u8; self.block_size as usize].into_boxed_slice())
+            .map(|_| {
+                vec![0x69u8; self.block_size as usize].into_boxed_slice()
+            })
             .collect();
 
         debug!("Set block_size={}", self.block_size,);
@@ -623,7 +655,12 @@ impl DsdIter {
         let mut file = self
             .file
             .as_ref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Missing input file handle"))?
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    "Missing input file handle",
+                )
+            })?
             .try_clone()?;
 
         if self.audio_pos > 0 {
@@ -633,7 +670,10 @@ impl DsdIter {
                 file.stream_position()?
             );
         }
-        self.reader = Box::new(BufReader::with_capacity(self.frame_size as usize * 8, file));
+        self.reader = Box::new(BufReader::with_capacity(
+            self.frame_size as usize * 8,
+            file,
+        ));
         Ok(())
     }
 
@@ -669,7 +709,9 @@ impl Iterator for DsdIter {
                                 self.retries += 1;
                                 return self.next();
                             } else {
-                                error!("Max retries reached for interrupted I/O.");
+                                error!(
+                                    "Max retries reached for interrupted I/O."
+                                );
                                 return None;
                             }
                         }
