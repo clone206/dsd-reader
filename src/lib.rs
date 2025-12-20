@@ -614,7 +614,7 @@ impl DsdIter {
             chan_bytes.push(if self.lsbit_first {
                 b
             } else {
-                bit_reverse_u8(b)
+                b.reverse_bits()
             });
         }
         chan_bytes
@@ -725,14 +725,4 @@ impl Iterator for DsdIter {
             }
         }
     }
-}
-
-/// Bit-reverse a byte, to convert from MSB-first to LSB-first or vice versa.
-#[inline]
-pub fn bit_reverse_u8(mut b: u8) -> u8 {
-    // Reverse bits in a byte (branchless, 3 shuffle steps)
-    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-    b
 }
