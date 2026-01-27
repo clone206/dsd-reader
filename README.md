@@ -22,7 +22,7 @@ For .dff files, this library only supports ID3 tags that appear at the end of th
 
 ## Examples
 
-Opening and reading a DFF file:
+### Opening and reading a DFF file
 ```rust
 use std::path::PathBuf;
 use dsd_reader::DsdReader;
@@ -46,7 +46,7 @@ fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 }
 ```
 
-Reading from stdin:
+### Reading from stdin
 ```rust
 use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 
@@ -74,7 +74,7 @@ fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 }
 ```
 
-Reading from raw dsd file (no metadata contained within):
+### Reading from raw dsd file (no metadata contained within)
 ```rust
 use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 use std::path::PathBuf;
