@@ -1,8 +1,12 @@
 # dsd-reader
-A library for reading DSD audio data. Allows for reading from standard in ("stdin"), 
-DSD container files (e.g. DSF or DFF), and raw DSD files, which are assumed to contain 
-no metadata. For reading stdin or raw DSD files, the library relies on certain input 
-parameters to interpret the format of the DSD data.
+A library for reading DSD audio data. DSD is a high-resolution digital audio format which
+encodes audio as a 1 bit stream at high sample rates using delta sigma modulation.
+
+The library allows for reading DSD from standard in ("stdin"); DSD container files (e.g. DSF or DFF);
+and raw DSD files, which are assumed to contain no metadata. For reading stdin or raw DSD files,
+the library relies on certain input parameters to interpret the format of the DSD data. Container
+files can also optionally include an [`ID3v2`](http://id3.org/) tag which contains metadata about the
+music e.g. artist, album, etc.
 
 Provides an iterator over the frames of the DSD data, which is basically a vector 
 of channels in planar format, with a `block_size` slice for each channel in least 
@@ -12,6 +16,9 @@ with which it can be iterated over and processed in certain scenarios,
 however it should be trivial for the implementer to convert to interleaved format if needed.
 
 For an example of a binary that uses this library, see [dsd2dxd](https://github.com/clone206/dsd2dxd).
+
+## DFF Notes
+For .dff files, this library only supports ID3 tags that appear at the end of the file, not those found in the property chunk. DST is not supported. Currently only supports mono and stereo audio.
 
 ## Examples
 
