@@ -135,6 +135,7 @@ pub enum DsdRate {
     DSD64 = 1,
     DSD128 = 2,
     DSD256 = 4,
+    DSD512 = 8,
 }
 
 impl TryFrom<u32> for DsdRate {
@@ -144,7 +145,8 @@ impl TryFrom<u32> for DsdRate {
             1 => Ok(DsdRate::DSD64),
             2 => Ok(DsdRate::DSD128),
             4 => Ok(DsdRate::DSD256),
-            _ => Err("Invalid DSD rate multiplier (expected 1,2,4)"),
+            8 => Ok(DsdRate::DSD512),
+            _ => Err("Invalid DSD rate multiplier (expected 1,2,4,8)"),
         }
     }
 }
@@ -256,7 +258,7 @@ impl DsdReader {
         let path_attrs = Self::get_path_attrs(&in_path)?;
 
         // Only enforce CLI dsd_rate for stdin or raw inputs
-        if path_attrs.std_in && ![1, 2, 4].contains(&(dsd_rate as u32)) {
+        if path_attrs.std_in && ![1, 2, 4, 8].contains(&(dsd_rate as u32)) {
             return Err("Unsupported DSD input rate.".into());
         }
 
