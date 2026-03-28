@@ -618,6 +618,7 @@ impl DsdIter {
                 let mut block_buf: Vec<u8> =
                     vec![DSD_SILENCE; self.block_size as usize];
                 self.reader.read_exact(&mut block_buf)?;
+
                 for i in 0..valid_for_chan {
                     let byte_index = chan + i * self.channels_num;
                     // One big output buffer for the whole frame. Hardcode zero index.
@@ -639,7 +640,8 @@ impl DsdIter {
             }
 
             if padding > 0 {
-                // If block is padded, discard padding from file so next channel starts aligned.
+                // If block is padded, discard padding from file so next channel 
+                // read starts aligned.
                 let byte_reader = self.reader.as_mut();
                 for _ in 0..padding {
                     byte_reader.bytes().next();
