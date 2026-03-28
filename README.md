@@ -8,12 +8,15 @@ the library relies on certain input parameters to interpret the format of the DS
 files can also optionally include an [`ID3v2`](http://id3.org/) tag which contains metadata about the
 music e.g. artist, album, etc.
 
-Provides an iterator over the frames of the DSD data, which is basically a vector 
+Provides an iterator over the frames of the DSD data, which by default is a vector 
 of channels in planar format, with a `block_size` slice for each channel in least 
 significant bit first order. Channels are ordered by number (ch1,ch2,...). 
-This planar format was chosen due to the prevalence of DSF files and the efficiency 
-with which it can be iterated over and processed in certain scenarios, 
-however it should be trivial for the implementer to convert to interleaved format if needed.
+This planar format was chosen as the default due to the prevalence of DSF files and the efficiency with which it can be iterated over and processed in certain scenarios.
+
+There is also an interleaved iterator available, which can be set to output
+either least significant bit first or most significant bit first.
+The output is a vector containing a single slice with 1 byte per channel,
+ordered by channel number, with this pattern repeating over each full frame.
 
 For an example of a binary that uses this library, see [dsd2dxd](https://github.com/clone206/dsd2dxd).
 
@@ -46,7 +49,7 @@ fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 }
 ```
 
-### Reading from stdin
+### Reading from stdin and iterating over interleaved output
 ```rust
 use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 
@@ -59,7 +62,7 @@ let dsd_reader = DsdReader::new(
     2 // Stereo
 ).unwrap();
 let channels_num = dsd_reader.channels_num();
-let dsd_iter = dsd_reader.dsd_iter().unwrap();
+let dsd_iter = dsd_reader.interleaved_iter().unwrap();
 
 for (read_size, chan_bufs) in dsd_iter {
     eprintln!("read_size: usize is {} bytes.", read_size);
