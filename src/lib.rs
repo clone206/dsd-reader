@@ -506,7 +506,7 @@ pub struct DsdIter {
     std_in: bool,
     bytes_remaining: u64,
     channels_num: usize,
-    block_buffers: Vec<Box<[u8]>>, // Gets resized when set_block_size is called, and each buffer is filled with the bytes for one channel or block of the current frame
+    out_buffers: Vec<Box<[u8]>>, // Gets resized when set_block_size is called, and each buffer is filled with the bytes for one channel or block of the current frame
     block_size: u32,
     reader: Box<dyn Read + Send>,
     frame_size: u32,
@@ -534,7 +534,7 @@ impl DsdIter {
                 dsd_input.audio_length
             },
             channels_num: dsd_input.channels_num,
-            block_buffers: Vec::new(),
+            out_buffers: Vec::new(),
             block_size: 0,
             reader: Box::new(io::empty()),
             frame_size: 0,
@@ -586,7 +586,8 @@ impl DsdIter {
     }
 
     /// Take frame of planar DSD bytes from input and write one channel
-    /// or block to the buffer(s) with the endianness we need.
+    /// or block to the buffer(s) with the endianness we need, returning
+    /// the number of audio bytes read (not including padding).
     #[inline(always)]
     fn write_blocks_from_planar(
         &mut self,
@@ -607,6 +608,10 @@ impl DsdIter {
         let padding = self.block_size as usize - valid_for_chan;
         let mut total_valid = 0usize;
 
+        // Now we resize the block size and corresponding output buffers, since we've
+        // calculated the valid bytes/padding for this frame's blocks.
+        // Block size is now effectively the valid bytes for each input channel block.
+        // This should be the last frame read.
         if partial_frame {
             self.set_block_size(valid_for_chan as u32);
         }
@@ -614,7 +619,8 @@ impl DsdIter {
         for chan in 0..self.channels_num {
             if self.out_interleaved {
                 // lsbf planar -> interleaved
-                // Interleave channel blocks into buffer
+                // Interleave channel blocks into output buffer, using temporary intermedate
+                // buffer for the raw planar data before interleaving it.
                 let mut block_buf: Vec<u8> =
                     vec![DSD_SILENCE; self.block_size as usize];
                 self.reader.read_exact(&mut block_buf)?;
@@ -622,11 +628,11 @@ impl DsdIter {
                 for i in 0..valid_for_chan {
                     let byte_index = chan + i * self.channels_num;
                     // One big output buffer for the whole frame. Hardcode zero index.
-                    if byte_index >= self.block_buffers[0].len() {
+                    if byte_index >= self.out_buffers[0].len() {
                         break;
                     }
                     let b = block_buf[i];
-                    self.block_buffers[0][byte_index] =
+                    self.out_buffers[0][byte_index] =
                         if self.lsbit_first == self.out_lsbf {
                             b
                         } else {
@@ -636,7 +642,7 @@ impl DsdIter {
             } else {
                 // lsbf planar -> lsbf planar
                 // Dump unchanged into out buffer, which was resized above if partial frame.
-                self.reader.read_exact(&mut self.block_buffers[chan])?;
+                self.reader.read_exact(&mut self.out_buffers[chan])?;
             }
 
             if padding > 0 {
@@ -653,7 +659,8 @@ impl DsdIter {
     }
 
     /// Take frame of interleaved DSD bytes from input and write one
-    /// channel or block to the buffer(s) with the endianness we need.
+    /// channel or block to the buffer(s) with the endianness we need,
+    /// returning the number of audio bytes read 
     #[inline(always)]
     fn write_blocks_from_interl(
         &mut self,
@@ -691,7 +698,7 @@ impl DsdIter {
                     b.reverse_bits()
                 });
             }
-            self.block_buffers[block_num].copy_from_slice(&block_bytes);
+            self.out_buffers[block_num].copy_from_slice(&block_bytes);
             bytes_written += block_size;
         }
         Ok(bytes_written)
@@ -702,7 +709,7 @@ impl DsdIter {
         self.block_size = block_size;
         self.frame_size = self.block_size * self.channels_num as u32;
 
-        self.block_buffers = (0..self.blocks_per_frame)
+        self.out_buffers = (0..self.blocks_per_frame)
             .map(|_| {
                 if self.out_interleaved {
                     // For interleaved output, we use a single buffer for the whole frame.
@@ -783,7 +790,7 @@ impl Iterator for DsdIter {
                 if !self.std_in {
                     self.bytes_remaining -= read_size as u64;
                 }
-                return Some((read_size, self.block_buffers.clone()));
+                return Some((read_size, self.out_buffers.clone()));
             }
             Err(e) => {
                 if let Some(io_err) = e.downcast_ref::<io::Error>() {
