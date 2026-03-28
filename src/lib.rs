@@ -575,9 +575,35 @@ impl DsdIter {
         };
 
         if self.interleaved {
-            Ok(self.write_blocks_from_interl(partial_frame)?)
+            if partial_frame {
+                // For interleaved (e.g. dff), we resize block/frame/buffer size
+                // right away since there is no zero padding to calculate on incomplete blocks.
+                self.set_block_size(
+                    (self.bytes_remaining / self.channels_num as u64)
+                        as u32,
+                );
+            }
+            Ok(self.write_blocks_from_interl()?)
         } else {
-            Ok(self.write_blocks_from_planar(partial_frame)?)
+            // Planar (e.g. DSF): Each input channel block is fixed size (block_size)
+            // and the last input frame may contain zero-padded tail inside each channel block.
+            // We compare the bytes remaining to each full input channel block size
+            // to determine how many padding bytes exist, skipping over
+            // this zero padding later.
+            let mut padding = 0usize;
+
+            if partial_frame {
+                let valid_for_chan =
+                    (self.bytes_remaining / self.channels_num as u64) as usize;
+                padding = self.block_size as usize - valid_for_chan;
+                // Now we resize the block size and corresponding output buffers, since we've
+                // calculated the valid bytes/padding for this frame's blocks.
+                // Block size will effectively be the valid bytes for each input channel block.
+                // This should be the last frame read.
+                self.set_block_size(valid_for_chan as u32);
+            }
+
+            Ok(self.write_blocks_from_planar(padding)?)
         }
     }
 
@@ -587,30 +613,9 @@ impl DsdIter {
     #[inline(always)]
     fn write_blocks_from_planar(
         &mut self,
-        partial_frame: bool,
+        padding: usize,
     ) -> Result<usize, Box<dyn Error>> {
-        // Planar (e.g. DSF): Each input channel block is fixed size (block_size)
-        // and the last input frame may contain zero-padded tail inside each channel block.
-        // We compare the bytes remaining to each full input channel block size
-        // to determine how many padding bytes exist, skipping over
-        // this zero padding later.
-        let remaining = if partial_frame {
-            self.bytes_remaining
-        } else {
-            self.frame_size as u64
-        };
-        let valid_for_chan =
-            (remaining / self.channels_num as u64) as usize;
-        let padding = self.block_size as usize - valid_for_chan;
         let mut bytes_written = 0usize;
-
-        // Now we resize the block size and corresponding output buffers, since we've
-        // calculated the valid bytes/padding for this frame's blocks.
-        // Block size will effectively be the valid bytes for each input channel block.
-        // This should be the last frame read.
-        if partial_frame {
-            self.set_block_size(valid_for_chan as u32);
-        }
 
         for chan in 0..self.channels_num {
             if self.out_interleaved {
@@ -658,15 +663,7 @@ impl DsdIter {
     #[inline(always)]
     fn write_blocks_from_interl(
         &mut self,
-        partial_frame: bool,
     ) -> Result<usize, Box<dyn Error>> {
-        if partial_frame {
-            // For interleaved (e.g. dff), we resize block/frame/buffer size
-            // right away since there is no zero padding to calculate on incomplete blocks.
-            self.set_block_size(
-                (self.bytes_remaining / self.channels_num as u64) as u32,
-            );
-        }
         let mut bytes_written = 0usize;
 
         self.reader.read_exact(&mut self.in_buffer)?;
