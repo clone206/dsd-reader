@@ -813,7 +813,7 @@ impl DsdIter {
             .collect();
         // Constant input buffer size for planar, interleaved gets resized since
         // there is no padding keeping the frame size constant
-        if self.out_interleaved {
+        if self.interleaved {
             self.in_buffer = vec![DSD_SILENCE; self.frame_size as usize];
         }
         self.in_buffer_remaining = self.in_buffer.len();
