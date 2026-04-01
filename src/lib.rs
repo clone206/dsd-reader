@@ -340,7 +340,7 @@ impl DsdReader {
 
     /// Construct and return instance of DSD sample iterator for reading DSD data frames, outputting interleaved data.
     /// * out_lsbf - Whether to output interleaved data in least significant bit first order (true) or most significant bit first order (false). Usually false is what you want.
-    /// * out_block_size - Block size in bytes per channel for each read. If None, will use same block size as input, which is usually what you want. Note that for interleaved input (e.g. dff), the block size is effectively the block size per channel since the channels are interleaved by byte.
+    /// * out_block_size - Block size in bytes per channel for each read. If None, will use same block size as input, which is usually what you want.
     pub fn interl_iter(
         &self,
         out_lsbf: bool,
