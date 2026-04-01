@@ -2,18 +2,24 @@
 A library for reading DSD audio data. DSD is a high-resolution digital audio format which
 encodes audio as a 1 bit stream at high sample rates using delta sigma modulation.
 
-The library allows for reading DSD from standard in ("stdin"); DSD container files (e.g. DSF or DFF);
-and raw DSD files, which are assumed to contain no metadata. For reading stdin or raw DSD files,
-the library relies on certain input parameters to interpret the format of the DSD data. Container
-files can also optionally include an [`ID3v2`](http://id3.org/) tag which contains metadata about the
-music e.g. artist, album, etc.
+Allows for reading from standard in ("stdin"),
+DSD container files (e.g. DSF or DFF), and raw DSD files, which are assumed to contain
+no metadata. For reading stdin or raw DSD files, the library relies on certain input
+parameters to interpret the format of the DSD data.
 
-Provides an iterator over the frames of the DSD data, which is basically a vector 
-of channels in planar format, with a `block_size` slice for each channel in least 
-significant bit first order. Channels are ordered by number (ch1,ch2,...). 
-This planar format was chosen due to the prevalence of DSF files and the efficiency 
-with which it can be iterated over and processed in certain scenarios, 
-however it should be trivial for the implementer to convert to interleaved format if needed.
+Provides iterators over the frames of the DSD data. `dsd_iter()` returns a vector
+of channels in planar format, with a `block_size` slice for each channel in least
+significant bit first order. Channels are ordered by number (ch1,ch2,...).
+This planar format was chosen due to the prevalence of DSF
+files and the efficiency with which it can be iterated over and processed
+in certain scenarios. For more control over the output of planar data, there is 
+also a `planar_iter(out_lsbf, out_block_size)` which allows you to specify 
+the bit endianness and block size of the output.
+
+There is also an interleaved iterator available, which can be set to output
+either least significant bit first or most significant bit first.
+The output is a vector containing a single slice with 1 byte per channel,
+ordered by channel number, with this pattern repeating over each full frame.
 
 For an example of a binary that uses this library, see [dsd2dxd](https://github.com/clone206/dsd2dxd).
 
