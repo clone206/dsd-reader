@@ -8,8 +8,8 @@
 //! significant bit first order. Channels are ordered by number (ch1,ch2,...).
 //! This planar format was chosen due to the prevalence of DSF
 //! files and the efficiency with which it can be iterated over and processed
-//! in certain scenarios. For more control over the output of planar data, there is 
-//! also a `planar_iter(out_lsbf, out_block_size)` which allows you to specify 
+//! in certain scenarios. For more control over the output of planar data, there is
+//! also a `planar_iter(out_lsbf, out_block_size)` which allows you to specify
 //! the bit endianness and block size of the output.
 //!
 //! There is also an interleaved iterator available, which can be set to output
@@ -44,7 +44,7 @@
 //! }
 //! ```
 //!
-//! ### Reading from stdin 
+//! ### Reading from stdin
 //!```no_run
 //! use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 //!
@@ -571,7 +571,11 @@ impl DsdIter {
             frame_size: 0,
             interleaved: dsd_input.interleaved,
             lsbit_first: dsd_input.lsbit_first,
-            in_buffer: Vec::new(),
+            in_buffer: vec![
+                DSD_SILENCE;
+                dsd_input.block_size as usize
+                    * dsd_input.channels_num
+            ],
             file: if let Some(file) = &dsd_input.file {
                 Some(file.try_clone()?)
             } else {
@@ -601,7 +605,7 @@ impl DsdIter {
     /// Read one frame of DSD data into the channel buffers and return the index of the
     /// first valid byte in the input buffer.
     #[inline(always)]
-    pub fn load_frame(&mut self) -> Result<usize, Box<dyn Error>> {
+    fn load_frame(&mut self) -> Result<usize, Box<dyn Error>> {
         //stdin always reads frame_size
         let partial_frame = if self.bytes_remaining
             < self.frame_size as u64
@@ -639,6 +643,10 @@ impl DsdIter {
                     as usize;
                 self.block_padding =
                     self.block_size as usize - valid_for_chan;
+                debug!(
+                    "Partial frame detected. Valid bytes for each channel: {}. Padding bytes per channel: {}. Input index: {}.",
+                    valid_for_chan, self.block_padding, self.in_index
+                );
                 // Now we resize the block size and corresponding output buffers, since we've
                 // calculated the valid bytes/padding for this frame's blocks.
                 // Block size will effectively be the valid bytes for each input channel block.
@@ -651,7 +659,7 @@ impl DsdIter {
         Ok(0)
     }
 
-    /// Delegate to the appropriate block writing function based on whether the input is interleaved or planar, 
+    /// Delegate to the appropriate block writing function based on whether the input is interleaved or planar,
     /// and return the number of audio bytes read (not including padding when input is planar).
     #[inline(always)]
     fn write_blocks(&mut self) -> Result<usize, Box<dyn Error>> {
@@ -706,11 +714,12 @@ impl DsdIter {
                     .iter()
                     .enumerate()
                 {
-                    self.out_buffers[chan][i] = if self.lsbit_first == self.out_lsbf {
-                        b
-                    } else {
-                        b.reverse_bits()
-                    };
+                    self.out_buffers[chan][i] =
+                        if self.lsbit_first == self.out_lsbf {
+                            b
+                        } else {
+                            b.reverse_bits()
+                        };
                 }
             }
             self.in_index += full_block;
@@ -736,11 +745,12 @@ impl DsdIter {
                 .iter()
                 .enumerate()
             {
-                self.out_buffers[0][i] = if self.lsbit_first == self.out_lsbf {
-                    b
-                } else {
-                    b.reverse_bits()
-                };
+                self.out_buffers[0][i] =
+                    if self.lsbit_first == self.out_lsbf {
+                        b
+                    } else {
+                        b.reverse_bits()
+                    };
             }
         } else {
             // interleaved -> planar, output slice per channel
@@ -801,7 +811,11 @@ impl DsdIter {
                 }
             })
             .collect();
-        self.in_buffer = vec![DSD_SILENCE; self.frame_size as usize];
+        // Constant input buffer size for planar, interleaved gets resized since
+        // there is no padding keeping the frame size constant
+        if self.out_interleaved {
+            self.in_buffer = vec![DSD_SILENCE; self.frame_size as usize];
+        }
         self.in_buffer_remaining = self.in_buffer.len();
 
         debug!(
@@ -847,7 +861,7 @@ impl DsdIter {
 
     /// Returns true if we have reached the end of file for non-stdin inputs
     #[inline(always)]
-    pub fn is_eof(&self) -> bool {
+    fn is_eof(&self) -> bool {
         !self.std_in && self.bytes_remaining == 0
     }
 }
