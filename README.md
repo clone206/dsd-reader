@@ -52,7 +52,7 @@ fn my_process_channel(chan: usize, chan_bytes: &[u8]) {
 }
 ```
 
-### Reading from stdin and iterating over interleaved output
+### Reading from stdin
 ```rust
 use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 
@@ -65,7 +65,7 @@ let dsd_reader = DsdReader::new(
     2 // Stereo
 ).unwrap();
 let channels_num = dsd_reader.channels_num();
-let dsd_iter = dsd_reader.interleaved_iter().unwrap();
+let dsd_iter = dsd_reader.dsd_iter().unwrap();
 
 for (read_size, chan_bufs) in dsd_iter {
     eprintln!("read_size: usize is {} bytes.", read_size);
