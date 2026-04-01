@@ -44,7 +44,7 @@
 //! }
 //! ```
 //!
-//! ### Reading from stdin and iterating over interleaved output
+//! ### Reading from stdin 
 //!```no_run
 //! use dsd_reader::{DsdReader, Endianness, FmtType, DsdRate};
 //!
@@ -57,7 +57,7 @@
 //!     2 // Stereo
 //! ).unwrap();
 //! let channels_num = dsd_reader.channels_num();
-//! let dsd_iter = dsd_reader.interleaved_iter().unwrap();
+//! let dsd_iter = dsd_reader.dsd_iter().unwrap();
 //!
 //! for (read_size, chan_bufs) in dsd_iter {
 //!     eprintln!("read_size: usize is {} bytes.", read_size);
