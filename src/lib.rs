@@ -3,12 +3,14 @@
 //! no metadata. For reading stdin or raw DSD files, the library relies on certain input
 //! parameters to interpret the format of the DSD data.
 //!
-//! Provides an iterator over the frames of the DSD data, which by default is a vector
+//! Provides iterators over the frames of the DSD data. `dsd_iter()` returns a vector
 //! of channels in planar format, with a `block_size` slice for each channel in least
 //! significant bit first order. Channels are ordered by number (ch1,ch2,...).
-//! This planar format was chosen for the default due to the prevalence of DSF
+//! This planar format was chosen due to the prevalence of DSF
 //! files and the efficiency with which it can be iterated over and processed
-//! in certain scenarios.
+//! in certain scenarios. For more control over the output of planar data, there is 
+//! also a `planar_iter(out_lsbf, out_block_size)` which allows you to specify 
+//! the bit endianness and block size of the output.
 //!
 //! There is also an interleaved iterator available, which can be set to output
 //! either least significant bit first or most significant bit first.
