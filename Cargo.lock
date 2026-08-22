@@ -38,9 +38,8 @@ dependencies = [
 [[package]]
 name = "dff-meta"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1642c0acdea3759f57de0abc51ffc2e11526bf2a77f5a551547d1257cb26e1d1"
 dependencies = [
+ "dsd-source",
  "id3",
 ]
 

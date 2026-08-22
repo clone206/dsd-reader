@@ -12,7 +12,11 @@ categories = ["multimedia", "parsing"]
 
 [dependencies]
 dsf-meta = "0.2.6"
-dff-meta = "0.1.4"
-dsd-source = { path = "vendor/dsd-source" }
+dff-meta = { path = "../dff" }
+# NOTE: points at the same physical checkout dff-meta uses (../dsd-source),
+# not the vendor/dsd-source submodule, so both crates resolve to one
+# `dsd-source` crate instance. Revert to `vendor/dsd-source` once dsd-source
+# is published and both dependents pin a released version instead.
+dsd-source = { path = "../dsd-source" }
 log = { version = "0.4.28", features = ["std"] }
 id3 = "1.16.3"
