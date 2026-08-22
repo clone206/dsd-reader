@@ -49,9 +49,17 @@ name = "dsd-reader"
 version = "0.3.1"
 dependencies = [
  "dff-meta",
+ "dsd-source",
  "dsf-meta",
  "id3",
  "log",
+]
+
+[[package]]
+name = "dsd-source"
+version = "0.1.0"
+dependencies = [
+ "id3",
 ]
 
 [[package]]

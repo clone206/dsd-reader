@@ -106,11 +106,11 @@
 
 pub mod dsd_file;
 use crate::dsd_file::{
-    DFF_BLOCK_SIZE, DSD_64_RATE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat,
-    FormatExtensions,
+    DFF_BLOCK_SIZE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions,
 };
+pub use dsd_source::{DSD_64_RATE, DsdRate, Endianness, FmtType};
 use log::{debug, error, info, warn};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs::File;
@@ -120,45 +120,6 @@ use std::vec;
 
 const RETRIES: usize = 1; // Max retries for progress send
 const DSD_SILENCE: u8 = 0x69; // The byte value used to fill channel buffers when padding or on partial frames. 0x69 is the standard value for silence in DSD.
-
-/// DSD bit endianness
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Endianness {
-    LsbFirst,
-    MsbFirst,
-}
-
-/// DSD channel format
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum FmtType {
-    /// Block per channel
-    Planar,
-    /// Byte per channel
-    Interleaved,
-}
-
-/// DSD rate multiplier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DsdRate {
-    #[default]
-    DSD64 = 1,
-    DSD128 = 2,
-    DSD256 = 4,
-    DSD512 = 8,
-}
-
-impl TryFrom<u32> for DsdRate {
-    type Error = &'static str;
-    fn try_from(v: u32) -> Result<Self, Self::Error> {
-        match v {
-            1 => Ok(DsdRate::DSD64),
-            2 => Ok(DsdRate::DSD128),
-            4 => Ok(DsdRate::DSD256),
-            8 => Ok(DsdRate::DSD512),
-            _ => Err("Invalid DSD rate multiplier (expected 1,2,4,8)"),
-        }
-    }
-}
 
 struct InputPathAttrs {
     std_in: bool,

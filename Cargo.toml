@@ -13,5 +13,6 @@ categories = ["multimedia", "parsing"]
 [dependencies]
 dsf-meta = "0.2.6"
 dff-meta = "0.1.4"
+dsd-source = { path = "vendor/dsd-source" }
 log = { version = "0.4.28", features = ["std"] }
 id3 = "1.16.3"

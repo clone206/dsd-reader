@@ -40,7 +40,8 @@ impl From<&PathBuf> for DsdFileFormat {
     }
 }
 
-pub const DSD_64_RATE: u32 = 2822400;
+pub use dsd_source::DSD_64_RATE;
+
 pub const DFF_BLOCK_SIZE: u32 = 1;
 pub const DSF_BLOCK_SIZE: u32 = 4096;
 
