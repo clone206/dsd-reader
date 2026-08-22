@@ -1,3 +1,7 @@
 [submodule "vendor/dsd-source"]
 	path = vendor/dsd-source
 	url = /Users/someguy/Projects/github/dsd-source
+[submodule "vendor/dff"]
+	path = vendor/dff
+	url = /Users/someguy/Projects/github/dff
+	branch = feature/20260821-trait-refactor
