@@ -26,6 +26,17 @@ For an example of a binary that uses this library, see [dsd2dxd](https://github.
 ## DFF Notes
 For .dff files, this library only supports ID3 tags that appear at the end of the file, not those found in the property chunk. DST is not supported. Currently only supports mono and stereo audio.
 
+## Adding a Container Format
+To add support for a new input file type, first implement the shared `dsd-source` traits in the crate that owns the format:
+
+1. Implement `DsdSource` for the format's file type. Its `info()` method must report the native channel count, endianness, layout, block size, sample rate, audio length, data offset, and optional tag. Its `reader()` method must return a boxed, sendable reader positioned at the beginning of the audio data.
+2. Implement `DsdSourceExtensions` for the same type and list its lowercase file extensions in `EXTENSIONS`.
+3. Publish the format crate, then add its crates.io dependency to `dsd-reader/Cargo.toml`.
+4. Update `src/dsd_file.rs`: add a `DsdFileFormat` variant, include it in `is_container()`, add its extension-detection arm, and add a `DsdFile::new()` branch that opens the format and maps its `DsdSource::info()` result into `DsdFile`.
+5. Regenerate `Cargo.lock` and add tests or fixtures for opening the new format and iterating its audio data.
+
+The existing `DsdReader` and `DsdIter` code should not need format-specific branches. They use the trait's reported layout and endianness to reshape data into the requested output format. Keep format parsing and native audio-stream handling in the format crate, and keep dispatch registration in `src/dsd_file.rs`.
+
 ## Examples
 
 ### Opening and reading a DFF file
