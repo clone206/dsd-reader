@@ -1,4 +1,4 @@
-use dsd_source::{DsdSource, Endianness, FmtType};
+use dsd_source::{DsdSource, DsdSourceExtensions, Endianness, FmtType};
 use id3::Tag;
 use log::warn;
 use std::{
@@ -28,12 +28,19 @@ impl FormatExtensions for DsdFileFormat {
 
 impl From<&PathBuf> for DsdFileFormat {
     fn from(path: &PathBuf) -> Self {
-        if let Some(ext) = path.extension() {
-            match ext.to_ascii_lowercase().to_string_lossy().as_ref() {
-                "dsf" => DsdFileFormat::Dsf,
-                "dff" => DsdFileFormat::Dsdiff,
-                _ => DsdFileFormat::Raw,
-            }
+        let Some(ext) = path.extension() else {
+            return DsdFileFormat::Raw;
+        };
+        let ext = ext.to_ascii_lowercase();
+        let ext = ext.to_string_lossy();
+        // Each format crate owns its own list of recognized extensions
+        // (via `DsdSourceExtensions`), so adding a new container format
+        // only requires adding a match arm here, not editing string
+        // literals disconnected from the crate that actually defines them.
+        if dsf_meta::DsfFile::EXTENSIONS.contains(&ext.as_ref()) {
+            DsdFileFormat::Dsf
+        } else if dff_meta::DffFile::EXTENSIONS.contains(&ext.as_ref()) {
+            DsdFileFormat::Dsdiff
         } else {
             DsdFileFormat::Raw
         }
