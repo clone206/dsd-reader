@@ -11,7 +11,7 @@ keywords = ["audio", "dsd", "dsf", "dff", "decoder"]
 categories = ["multimedia", "parsing"]
 
 [dependencies]
-dsf-meta = "0.2.6"
+dsf-meta = { path = "vendor/dsf_meta" }
 dff-meta = { path = "vendor/dff" }
 # dff-meta's Cargo.toml depends on `dsd-source = { path = "../dsd-source" }`,
 # which (via vendor/dff's nesting) resolves to this same vendor/dsd-source

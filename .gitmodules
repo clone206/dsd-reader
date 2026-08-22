@@ -5,3 +5,7 @@
 	path = vendor/dff
 	url = /Users/someguy/Projects/github/dff
 	branch = feature/20260821-trait-refactor
+[submodule "vendor/dsf_meta"]
+	path = vendor/dsf_meta
+	url = /Users/someguy/Projects/gitlab/dsf_meta
+	branch = feature/20260821-trait-refactor

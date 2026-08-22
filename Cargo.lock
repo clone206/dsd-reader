@@ -63,10 +63,9 @@ dependencies = [
 
 [[package]]
 name = "dsf-meta"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "423eaa257135a9356aa28bbe4904dc1370d3b5cf065182bb495ad9d3f929553e"
+version = "0.2.7"
 dependencies = [
+ "dsd-source",
  "id3",
  "sampled_data_duration",
 ]
