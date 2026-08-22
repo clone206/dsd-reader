@@ -29,13 +29,13 @@ For .dff files, this library only supports ID3 tags that appear at the end of th
 ## Adding a Container Format
 To add support for a new input file type, first implement the shared `dsd-source` traits in the crate that owns the format:
 
-1. Implement `DsdSource` for the format's file type. Its `info()` method must report the native channel count, endianness, layout, block size, sample rate, audio length, data offset, and optional tag. Its `reader()` method must return a boxed, sendable reader positioned at the beginning of the audio data.
+1. Implement `DsdSource` for the format's file type. Its `info()` method must report the native channel count, endianness, layout, block size, sample rate, audio length, data offset, and optional tag (all as `Option`s except audio length/data offset, which are always knowable). Its `reader()` method must return a boxed, sendable reader positioned at the beginning of the audio data. Its `file_len()` method must report the underlying file's actual on-disk size (typically `self.file.metadata()?.len()`).
 2. Implement `DsdSourceExtensions` for the same type and list its lowercase file extensions in `EXTENSIONS`.
 3. Publish the format crate, then add its crates.io dependency to `dsd-reader/Cargo.toml`.
-4. Update `src/dsd_file.rs`: add a `DsdFileFormat` variant, include it in `is_container()`, add its extension-detection arm, and add a `DsdFile::new()` branch that opens the format and maps its `DsdSource::info()` result into `DsdFile`.
+4. Update `src/dsd_file.rs`: add a `DsdFileFormat` variant, include it in `is_container()`, add its extension-detection arm to `From<&PathBuf> for DsdFileFormat`, add an `open_<format>()` helper that opens the file and returns `Box<dyn DsdSource>`, and add a match arm for it in `open_source()` (falling back to `open_raw()` on a container open/parse error, same as the existing DSF/DFF arms).
 5. Regenerate `Cargo.lock` and add tests or fixtures for opening the new format and iterating its audio data.
 
-The existing `DsdReader` and `DsdIter` code should not need format-specific branches. They use the trait's reported layout and endianness to reshape data into the requested output format. Keep format parsing and native audio-stream handling in the format crate, and keep dispatch registration in `src/dsd_file.rs`.
+The existing `DsdReader` and `DsdIter` code should not need format-specific branches. They read every field they need straight off the returned `Box<dyn DsdSource>` via the trait's own getter methods (`channels()`, `endianness()`, `layout()`, etc.), and use the reported layout and endianness to reshape data into the requested output format. Keep format parsing and native audio-stream handling in the format crate, and keep dispatch registration in `src/dsd_file.rs`.
 
 ## Examples
 

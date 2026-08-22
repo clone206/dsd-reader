@@ -1,8 +1,8 @@
-use dsd_source::{DsdSource, DsdSourceExtensions, Endianness, FmtType};
-use id3::Tag;
-use log::warn;
+use dsd_source::{DsdSource, DsdSourceError, DsdSourceExtensions, DsdSourceInfo};
+use log::{info, warn};
 use std::{
     fs::File,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
@@ -48,146 +48,115 @@ impl From<&PathBuf> for DsdFileFormat {
 }
 
 pub use dff_meta::DFF_BLOCK_SIZE;
-pub use dsd_source::DSD_64_RATE;
 pub use dsf_meta::DSF_BLOCK_SIZE;
 
-/// A DSD input opened from a file path: either a [`DsdSource`]-backed
-/// container (DSF, DFF), or a raw file with no container metadata.
-pub struct DsdFile {
+/// A raw DSD file with no container metadata: a [`DsdSource`] whose
+/// [`DsdSourceInfo`] has every format-specific field as `None`, and whose
+/// audio data starts at byte 0.
+struct RawSource {
+    file: File,
     audio_length: u64,
-    /// Byte offset where audio data begins; used only to sanity-check
-    /// container-reported `audio_length` against the file's actual size.
-    /// Always 0 for raw input.
-    data_offset: u64,
-    channel_count: Option<usize>,
-    is_lsb: Option<bool>,
-    layout: Option<FmtType>,
-    block_size: Option<u32>,
-    sample_rate: Option<u32>,
-    container_format: DsdFileFormat,
-    tag: Option<Tag>,
-    source: Option<Box<dyn DsdSource>>,
-    file: Option<File>,
 }
 
-impl DsdFile {
-    pub fn audio_length(&self) -> u64 {
-        self.audio_length
-    }
-    pub fn data_offset(&self) -> u64 {
-        self.data_offset
-    }
-    pub fn tag(&self) -> Option<&Tag> {
-        self.tag.as_ref()
-    }
-    pub fn channel_count(&self) -> Option<usize> {
-        self.channel_count
-    }
-    pub fn is_lsb(&self) -> Option<bool> {
-        self.is_lsb
-    }
-    /// Native channel layout (planar vs. interleaved), format-agnostic.
-    pub fn layout(&self) -> Option<FmtType> {
-        self.layout
-    }
-    pub fn block_size(&self) -> Option<u32> {
-        self.block_size
-    }
-    pub fn sample_rate(&self) -> Option<u32> {
-        self.sample_rate
-    }
-    pub fn container_format(&self) -> DsdFileFormat {
-        self.container_format
-    }
-    /// Consumes `self`, returning the container's [`DsdSource`] (if any) and
-    /// the raw file handle (present only for [`DsdFileFormat::Raw`] input).
-    pub fn into_parts(self) -> (Option<Box<dyn DsdSource>>, Option<File>) {
-        (self.source, self.file)
+impl DsdSource for RawSource {
+    fn info(&self) -> Result<DsdSourceInfo, DsdSourceError> {
+        Ok(DsdSourceInfo {
+            channels: None,
+            endianness: None,
+            layout: None,
+            block_size: None,
+            sample_rate: None,
+            audio_length: self.audio_length,
+            data_offset: 0,
+            tag: None,
+        })
     }
 
-    pub fn new(
-        path: &PathBuf,
-        file_format: DsdFileFormat,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        if file_format == DsdFileFormat::Dsf {
-            use dsf_meta::DsfFile;
-            let file_path = Path::new(&path);
-            let dsf_file = DsfFile::open(file_path)?;
-            if let Some(e) = dsf_file.tag_read_err() {
-                warn!(
-                    "Attempted read of ID3 tag failed. Partial read attempted: {}",
-                    e
-                );
-            }
-            let info = dsf_file
-                .info()
-                .map_err(|e| -> Box<dyn std::error::Error> { e })?;
-            Ok(Self {
-                sample_rate: Some(info.sample_rate),
-                container_format: DsdFileFormat::Dsf,
-                channel_count: Some(info.channels),
-                is_lsb: Some(info.endianness == Endianness::LsbFirst),
-                layout: Some(info.layout),
-                block_size: Some(info.block_size),
-                audio_length: info.audio_length,
-                data_offset: info.data_offset,
-                tag: info.tag,
-                source: Some(Box::new(dsf_file)),
-                file: None,
-            })
-        } else if file_format == DsdFileFormat::Dsdiff {
-            use dff_meta::DffFile;
-            use dff_meta::model::*;
-            let file_path = Path::new(&path);
-            let dff_file = match DffFile::open(file_path) {
-                Ok(dff) => dff,
-                Err(Error::Id3Error(e, dff_file)) => {
-                    warn!(
-                        "Attempted read of ID3 tag failed. Partial read attempted: {}",
-                        e
-                    );
-                    dff_file
-                }
-                Err(e) => {
-                    return Err(e.into());
-                }
-            };
-            let info = dff_file
-                .info()
-                .map_err(|e| -> Box<dyn std::error::Error> { e })?;
-            Ok(Self {
-                sample_rate: Some(info.sample_rate),
-                container_format: DsdFileFormat::Dsdiff,
-                channel_count: Some(info.channels),
-                is_lsb: Some(info.endianness == Endianness::LsbFirst),
-                layout: Some(info.layout),
-                block_size: Some(info.block_size),
-                audio_length: info.audio_length,
-                data_offset: info.data_offset,
-                tag: info.tag,
-                source: Some(Box::new(dff_file)),
-                file: None,
-            })
-        } else if file_format == DsdFileFormat::Raw {
-            let Ok(meta) = std::fs::metadata(path) else {
-                return Err("Failed to read input file metadata".into());
-            };
-            Ok(Self {
-                sample_rate: None,
-                container_format: DsdFileFormat::Raw,
-                channel_count: None,
-                is_lsb: None,
-                layout: None,
-                block_size: None,
-                audio_length: meta.len(),
-                data_offset: 0,
-                tag: None,
-                source: None,
-                file: Some(File::open(path)?),
-            })
-        } else {
-            Err("Unsupported file type; only dsf, dff, and raw dsd files are supported"
-                .into())
-        }
+    fn reader(&self) -> Result<Box<dyn Read + Send>, DsdSourceError> {
+        let mut file = self.file.try_clone()?;
+        file.seek(SeekFrom::Start(0))?;
+        Ok(Box::new(file))
     }
+
+    fn file_len(&self) -> Result<u64, DsdSourceError> {
+        Ok(self.audio_length)
+    }
+}
+
+/// Opens `path` as a [`DsdSource`], sniffing the container format from its
+/// file extension. Callers get back a single trait object regardless of
+/// whether the input is a container (DSF, DFF) or a raw file with no
+/// header — all format-specific fields are queried uniformly via
+/// [`DsdSource`]'s getter methods (including [`DsdSource::file_len`] for the
+/// file's actual on-disk size). If a container fails to open or parse,
+/// falls back to treating the file as raw DSD.
+pub fn open_source(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Error>> {
+    match DsdFileFormat::from(path) {
+        DsdFileFormat::Dsf => open_dsf(path).or_else(|e| {
+            info!("Container open failed with error: {}", e);
+            info!("Treating input as raw DSD (no container)");
+            open_raw(path)
+        }),
+        DsdFileFormat::Dsdiff => open_dff(path).or_else(|e| {
+            info!("Container open failed with error: {}", e);
+            info!("Treating input as raw DSD (no container)");
+            open_raw(path)
+        }),
+        DsdFileFormat::Raw => open_raw(path),
+    }
+}
+
+fn open_dsf(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Error>> {
+    use dsf_meta::DsfFile;
+    let dsf_file = DsfFile::open(Path::new(&path))?;
+    if let Some(e) = dsf_file.tag_read_err() {
+        warn!(
+            "Attempted read of ID3 tag failed. Partial read attempted: {}",
+            e
+        );
+    }
+    // Validate metadata parsed cleanly; on failure, let the caller fall
+    // back to treating this as a raw file.
+    check_info(&dsf_file)?;
+    Ok(Box::new(dsf_file))
+}
+
+fn open_dff(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Error>> {
+    use dff_meta::DffFile;
+    use dff_meta::model::*;
+    let dff_file = match DffFile::open(Path::new(&path)) {
+        Ok(dff) => dff,
+        Err(Error::Id3Error(e, dff_file)) => {
+            warn!(
+                "Attempted read of ID3 tag failed. Partial read attempted: {}",
+                e
+            );
+            dff_file
+        }
+        Err(e) => return Err(e.into()),
+    };
+    check_info(&dff_file)?;
+    Ok(Box::new(dff_file))
+}
+
+/// Validates that `source.info()` parsed cleanly. `DsdSourceError` (`Box<dyn
+/// Error + Send + Sync>`) has no `From`/`Into` impl into `Box<dyn Error>`
+/// (the blanket impl needs the source error to be `Sized`), but returning it
+/// directly here still works: the function's declared return type gives the
+/// compiler enough context to unsize-coerce it automatically.
+fn check_info(source: &dyn DsdSource) -> Result<(), Box<dyn std::error::Error>> {
+    match source.info() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+fn open_raw(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Error>> {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return Err("Failed to read input file metadata".into());
+    };
+    Ok(Box::new(RawSource {
+        file: File::open(path)?,
+        audio_length: meta.len(),
+    }))
 }
