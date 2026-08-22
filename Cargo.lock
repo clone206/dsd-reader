@@ -37,7 +37,7 @@ dependencies = [
 
 [[package]]
 name = "dff-meta"
-version = "0.1.4"
+version = "0.1.6"
 dependencies = [
  "dsd-source",
  "id3",
@@ -65,7 +65,7 @@ dependencies = [
 
 [[package]]
 name = "dsf-meta"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "dsd-source",
  "id3",
