@@ -12,8 +12,8 @@ categories = ["multimedia", "parsing"]
 
 [dependencies]
 # TEMP local-dev overrides, revert to version pins before publishing
-dsf-meta = { path = "../../gitlab/dsf_meta" }
-dff-meta = { path = "../dff" }
-dsd-source = { path = "../dsd-source" }
+dsf-meta = "0.3.0"
+dff-meta = "0.2.0"
+dsd-source = "0.2.0"
 log = { version = "0.4.28", features = ["std"] }
 id3 = "1.16.3"

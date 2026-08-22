@@ -37,7 +37,9 @@ dependencies = [
 
 [[package]]
 name = "dff-meta"
-version = "0.1.6"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06301c411497b9d471ba2aa728dc666fd4c5c300673c2f4d937eb6a737824a1b"
 dependencies = [
  "dsd-source",
  "id3",
@@ -56,14 +58,18 @@ dependencies = [
 
 [[package]]
 name = "dsd-source"
-version = "0.1.0"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abefa93db26ebcaae898dedd37f9a3e8378c369b1c251adf54e73e7f1195aa37"
 dependencies = [
  "id3",
 ]
 
 [[package]]
 name = "dsf-meta"
-version = "0.2.8"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfc2ace16a9905a870d157d87cbd179d701714fe6315a47e61fa194a3d6f7f1a"
 dependencies = [
  "dsd-source",
  "id3",
