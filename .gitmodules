@@ -1,8 +1,0 @@
-[submodule "vendor/dff"]
-	path = vendor/dff
-	url = https://github.com/clone206/dff.git
-	branch = feature/20260821-trait-refactor
-[submodule "vendor/dsf_meta"]
-	path = vendor/dsf_meta
-	url = https://gitlab.com/clone206/dsf.git
-	branch = feature/20260821-trait-refactor
