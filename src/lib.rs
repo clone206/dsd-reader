@@ -108,13 +108,14 @@ pub mod dsd_file;
 use crate::dsd_file::{
     DFF_BLOCK_SIZE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions,
 };
+use dsd_source::DsdSource;
 pub use dsd_source::{DSD_64_RATE, DsdRate, Endianness, FmtType};
 use log::{debug, error, info, warn};
 use std::convert::TryInto;
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs::File;
-use std::io::{self, BufReader, ErrorKind, Read, Seek, SeekFrom};
+use std::io::{self, BufReader, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::vec;
 
@@ -141,8 +142,8 @@ pub struct DsdReader {
     in_path: Option<PathBuf>,
     lsbit_first: bool,
     interleaved: bool,
-    audio_pos: u64,
     file: Option<File>,
+    source: Option<Box<dyn DsdSource>>,
     file_format: Option<DsdFileFormat>,
 }
 impl Default for DsdReader {
@@ -159,8 +160,8 @@ impl Default for DsdReader {
             in_path: None,
             lsbit_first: false,
             interleaved: true,
-            audio_pos: 0,
             file: None,
+            source: None,
             file_format: None,
         }
     }
@@ -243,8 +244,8 @@ impl DsdReader {
             channels_num: channels,
             block_size: block_size,
             audio_length: 0,
-            audio_pos: 0,
             file: None,
+            source: None,
             tag: None,
             file_name: path_attrs.file_name,
             file_format: path_attrs.file_format,
@@ -395,16 +396,13 @@ impl DsdReader {
         );
         match DsdFile::new(path, dsd_file_format) {
             Ok(my_dsd) => {
-                // Pull raw fields
-                let file_len = my_dsd.file().metadata()?.len();
+                let file_len = std::fs::metadata(path)?.len();
                 debug!("File size: {} bytes", file_len);
 
-                self.file = Some(my_dsd.file().try_clone()?);
                 self.tag = my_dsd.tag().cloned();
 
-                self.audio_pos = my_dsd.audio_pos();
                 // Clamp audio_length to what the file can actually contain
-                let max_len: u64 = (file_len - self.audio_pos).max(0);
+                let max_len: u64 = file_len.saturating_sub(my_dsd.data_offset());
                 self.audio_length = if my_dsd.audio_length() > 0
                     && my_dsd.audio_length() <= max_len
                 {
@@ -465,6 +463,10 @@ impl DsdReader {
                     self.channels_num,
                     self.interleaved,
                 );
+
+                let (source, file) = my_dsd.into_parts();
+                self.source = source;
+                self.file = file;
             }
             Err(e) if dsd_file_format != DsdFileFormat::Raw => {
                 info!("Container open failed with error: {}", e);
@@ -491,8 +493,6 @@ pub struct DsdIter {
     interleaved: bool,
     lsbit_first: bool,
     in_buffer: Vec<u8>,
-    file: Option<File>,
-    audio_pos: u64,
     retries: usize,
     out_interleaved: bool,
     out_lsbf: bool,
@@ -537,12 +537,6 @@ impl DsdIter {
                 dsd_input.block_size as usize
                     * dsd_input.channels_num
             ],
-            file: if let Some(file) = &dsd_input.file {
-                Some(file.try_clone()?)
-            } else {
-                None
-            },
-            audio_pos: dsd_input.audio_pos,
             retries: 0,
             out_interleaved,
             out_lsbf,
@@ -558,7 +552,7 @@ impl DsdIter {
         };
         ctx.equal_size_blocks = ctx.block_size == ctx.out_block_size;
         ctx.set_block_size(dsd_input.block_size);
-        ctx.set_reader()?;
+        ctx.set_reader(dsd_input)?;
         ctx.in_index = ctx.load_frame()?;
         Ok(ctx)
     }
@@ -785,7 +779,7 @@ impl DsdIter {
         );
     }
 
-    fn set_reader(&mut self) -> Result<(), Box<dyn Error>> {
+    fn set_reader(&mut self, dsd_input: &DsdReader) -> Result<(), Box<dyn Error>> {
         if self.std_in {
             // Use Stdin (not StdinLock) so the reader is 'static + Send for threaded use
             self.reader = Box::new(BufReader::with_capacity(
@@ -794,8 +788,19 @@ impl DsdIter {
             ));
             return Ok(());
         }
-        // Obtain an owned File by cloning the handle from InputContext, then seek if needed.
-        let mut file = self
+        // Container sources hand back a reader already positioned at the
+        // start of their audio data.
+        if let Some(source) = &dsd_input.source {
+            self.reader = Box::new(BufReader::with_capacity(
+                self.frame_size as usize * 8,
+                source
+                    .reader()
+                    .map_err(|e| -> Box<dyn Error> { e })?,
+            ));
+            return Ok(());
+        }
+        // Raw input has no header, so reading always starts at byte 0.
+        let file = dsd_input
             .file
             .as_ref()
             .ok_or_else(|| {
@@ -805,14 +810,6 @@ impl DsdIter {
                 )
             })?
             .try_clone()?;
-
-        if self.audio_pos > 0 {
-            file.seek(SeekFrom::Start(self.audio_pos as u64))?;
-            debug!(
-                "Seeked to audio start position: {}",
-                file.stream_position()?
-            );
-        }
         self.reader = Box::new(BufReader::with_capacity(
             self.frame_size as usize * 8,
             file,
