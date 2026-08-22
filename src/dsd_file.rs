@@ -49,6 +49,7 @@ impl From<&PathBuf> for DsdFileFormat {
 
 pub use dff_meta::DFF_BLOCK_SIZE;
 pub use dsf_meta::DSF_BLOCK_SIZE;
+pub use dsd_source::DSD_64_RATE;
 
 /// A raw DSD file with no container metadata: a [`DsdSource`] whose
 /// [`DsdSourceInfo`] has every format-specific field as `None`, and whose
