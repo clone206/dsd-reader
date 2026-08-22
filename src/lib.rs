@@ -376,7 +376,13 @@ impl DsdReader {
             self.parent_path.as_ref().unwrap().display()
         );
         let source = open_source(path)?;
-        let file_len = std::fs::metadata(path)?.len();
+        // Not `?`: DsdSourceError has no From/Into impl into Box<dyn Error> (needs Sized),
+        // but returning it directly here still unsize-coerces fine.
+        #[allow(clippy::question_mark)]
+        let file_len = match source.file_len() {
+            Ok(len) => len,
+            Err(e) => return Err(e),
+        };
         debug!("File size: {} bytes", file_len);
 
         self.tag = source.tag();

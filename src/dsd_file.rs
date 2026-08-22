@@ -77,13 +77,18 @@ impl DsdSource for RawSource {
         file.seek(SeekFrom::Start(0))?;
         Ok(Box::new(file))
     }
+
+    fn file_len(&self) -> Result<u64, DsdSourceError> {
+        Ok(self.audio_length)
+    }
 }
 
 /// Opens `path` as a [`DsdSource`], sniffing the container format from its
 /// file extension. Callers get back a single trait object regardless of
 /// whether the input is a container (DSF, DFF) or a raw file with no
 /// header — all format-specific fields are queried uniformly via
-/// [`DsdSource`]'s getter methods. If a container fails to open or parse,
+/// [`DsdSource`]'s getter methods (including [`DsdSource::file_len`] for the
+/// file's actual on-disk size). If a container fails to open or parse,
 /// falls back to treating the file as raw DSD.
 pub fn open_source(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Error>> {
     match DsdFileFormat::from(path) {
@@ -112,9 +117,7 @@ fn open_dsf(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Er
     }
     // Validate metadata parsed cleanly; on failure, let the caller fall
     // back to treating this as a raw file.
-    dsf_file
-        .info()
-        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+    check_info(&dsf_file)?;
     Ok(Box::new(dsf_file))
 }
 
@@ -132,10 +135,20 @@ fn open_dff(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Er
         }
         Err(e) => return Err(e.into()),
     };
-    dff_file
-        .info()
-        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+    check_info(&dff_file)?;
     Ok(Box::new(dff_file))
+}
+
+/// Validates that `source.info()` parsed cleanly. `DsdSourceError` (`Box<dyn
+/// Error + Send + Sync>`) has no `From`/`Into` impl into `Box<dyn Error>`
+/// (the blanket impl needs the source error to be `Sized`), but returning it
+/// directly here still works: the function's declared return type gives the
+/// compiler enough context to unsize-coerce it automatically.
+fn check_info(source: &dyn DsdSource) -> Result<(), Box<dyn std::error::Error>> {
+    match source.info() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 fn open_raw(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Error>> {
@@ -147,5 +160,3 @@ fn open_raw(path: &PathBuf) -> Result<Box<dyn DsdSource>, Box<dyn std::error::Er
         audio_length: meta.len(),
     }))
 }
-
-
