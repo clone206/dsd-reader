@@ -1,4 +1,4 @@
-use dsd_source::{DsdSource, Endianness};
+use dsd_source::{DsdSource, Endianness, FmtType};
 use id3::Tag;
 use log::warn;
 use std::{
@@ -54,6 +54,7 @@ pub struct DsdFile {
     data_offset: u64,
     channel_count: Option<usize>,
     is_lsb: Option<bool>,
+    layout: Option<FmtType>,
     block_size: Option<u32>,
     sample_rate: Option<u32>,
     container_format: DsdFileFormat,
@@ -77,6 +78,10 @@ impl DsdFile {
     }
     pub fn is_lsb(&self) -> Option<bool> {
         self.is_lsb
+    }
+    /// Native channel layout (planar vs. interleaved), format-agnostic.
+    pub fn layout(&self) -> Option<FmtType> {
+        self.layout
     }
     pub fn block_size(&self) -> Option<u32> {
         self.block_size
@@ -115,6 +120,7 @@ impl DsdFile {
                 container_format: DsdFileFormat::Dsf,
                 channel_count: Some(info.channels),
                 is_lsb: Some(info.endianness == Endianness::LsbFirst),
+                layout: Some(info.layout),
                 block_size: Some(info.block_size),
                 audio_length: info.audio_length,
                 data_offset: info.data_offset,
@@ -147,6 +153,7 @@ impl DsdFile {
                 container_format: DsdFileFormat::Dsdiff,
                 channel_count: Some(info.channels),
                 is_lsb: Some(info.endianness == Endianness::LsbFirst),
+                layout: Some(info.layout),
                 block_size: Some(info.block_size),
                 audio_length: info.audio_length,
                 data_offset: info.data_offset,
@@ -163,6 +170,7 @@ impl DsdFile {
                 container_format: DsdFileFormat::Raw,
                 channel_count: None,
                 is_lsb: None,
+                layout: None,
                 block_size: None,
                 audio_length: meta.len(),
                 data_offset: 0,

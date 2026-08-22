@@ -105,9 +105,7 @@
 //! ```
 
 pub mod dsd_file;
-use crate::dsd_file::{
-    DFF_BLOCK_SIZE, DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions,
-};
+use crate::dsd_file::{DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions};
 use dsd_source::DsdSource;
 pub use dsd_source::{DSD_64_RATE, DsdRate, Endianness, FmtType};
 use log::{debug, error, info, warn};
@@ -421,22 +419,21 @@ impl DsdReader {
                     self.lsbit_first = lsb;
                 }
 
-                // Interleaving from container (DSF = block-interleaved → treat as planar per frame)
-                match my_dsd.container_format() {
-                    DsdFileFormat::Dsdiff => self.interleaved = true,
-                    DsdFileFormat::Dsf => self.interleaved = false,
-                    DsdFileFormat::Raw => {}
+                // Channel layout from container. Format-agnostic: driven
+                // entirely by what the DsdSource reports, not by which
+                // concrete container format it is.
+                if let Some(layout) = my_dsd.layout() {
+                    self.interleaved = matches!(layout, FmtType::Interleaved);
                 }
 
-                // Block size from container.
-                // For dff, which always has a block size per channel of 1,
-                // we accept the user-supplied or default block size, which really
-                // just governs how many bytes we read at a time.
-                // For DSF, we treat the block size as representing the
-                // block size per channel and override any user-supplied
-                // or default values for block size.
-                if let Some(block_size) = my_dsd.block_size()
-                    && block_size > DFF_BLOCK_SIZE
+                // Block size from container. Planar containers (e.g. DSF)
+                // have a meaningful per-channel block size, which we treat
+                // as authoritative. Interleaved containers (e.g. DFF) have
+                // no real block structure, so we keep the user-supplied or
+                // default block size, which just governs how many bytes we
+                // read at a time.
+                if let Some(FmtType::Planar) = my_dsd.layout()
+                    && let Some(block_size) = my_dsd.block_size()
                 {
                     self.block_size = block_size;
                     debug!("Set block_size={}", self.block_size,);
