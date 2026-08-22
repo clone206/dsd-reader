@@ -105,14 +105,13 @@
 //! ```
 
 pub mod dsd_file;
-use crate::dsd_file::{DSF_BLOCK_SIZE, DsdFile, DsdFileFormat, FormatExtensions};
+use crate::dsd_file::{DSF_BLOCK_SIZE, DsdFileFormat, FormatExtensions, open_source};
 use dsd_source::DsdSource;
 pub use dsd_source::{DSD_64_RATE, DsdRate, Endianness, FmtType};
 use log::{debug, error, info, warn};
 use std::convert::TryInto;
 use std::error::Error;
 use std::ffi::OsString;
-use std::fs::File;
 use std::io::{self, BufReader, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::vec;
@@ -140,7 +139,6 @@ pub struct DsdReader {
     in_path: Option<PathBuf>,
     lsbit_first: bool,
     interleaved: bool,
-    file: Option<File>,
     source: Option<Box<dyn DsdSource>>,
     file_format: Option<DsdFileFormat>,
 }
@@ -158,7 +156,6 @@ impl Default for DsdReader {
             in_path: None,
             lsbit_first: false,
             interleaved: true,
-            file: None,
             source: None,
             file_format: None,
         }
@@ -242,7 +239,6 @@ impl DsdReader {
             channels_num: channels,
             block_size: block_size,
             audio_length: 0,
-            file: None,
             source: None,
             tag: None,
             file_name: path_attrs.file_name,
@@ -392,37 +388,38 @@ impl DsdReader {
             "Parent path: {}",
             self.parent_path.as_ref().unwrap().display()
         );
-        match DsdFile::new(path, dsd_file_format) {
-            Ok(my_dsd) => {
+        match open_source(path, dsd_file_format) {
+            Ok(source) => {
                 let file_len = std::fs::metadata(path)?.len();
                 debug!("File size: {} bytes", file_len);
 
-                self.tag = my_dsd.tag().cloned();
+                self.tag = source.tag();
 
                 // Clamp audio_length to what the file can actually contain
-                let max_len: u64 = file_len.saturating_sub(my_dsd.data_offset());
-                self.audio_length = if my_dsd.audio_length() > 0
-                    && my_dsd.audio_length() <= max_len
+                let data_offset = source.data_offset().unwrap_or(0);
+                let max_len: u64 = file_len.saturating_sub(data_offset);
+                let reported_audio_length = source.audio_length().unwrap_or(0);
+                self.audio_length = if reported_audio_length > 0 && reported_audio_length <= max_len
                 {
-                    my_dsd.audio_length()
+                    reported_audio_length
                 } else {
                     max_len
                 };
 
                 // Channels from container (fallback to CLI on nonsense)
-                if let Some(chans_num) = my_dsd.channel_count() {
+                if let Some(chans_num) = source.channels() {
                     self.channels_num = chans_num;
                 }
 
                 // Bit order from container
-                if let Some(lsb) = my_dsd.is_lsb() {
-                    self.lsbit_first = lsb;
+                if let Some(endianness) = source.endianness() {
+                    self.lsbit_first = endianness == Endianness::LsbFirst;
                 }
 
                 // Channel layout from container. Format-agnostic: driven
                 // entirely by what the DsdSource reports, not by which
                 // concrete container format it is.
-                if let Some(layout) = my_dsd.layout() {
+                if let Some(layout) = source.layout() {
                     self.interleaved = matches!(layout, FmtType::Interleaved);
                 }
 
@@ -432,15 +429,15 @@ impl DsdReader {
                 // no real block structure, so we keep the user-supplied or
                 // default block size, which just governs how many bytes we
                 // read at a time.
-                if let Some(FmtType::Planar) = my_dsd.layout()
-                    && let Some(block_size) = my_dsd.block_size()
+                if let Some(FmtType::Planar) = source.layout()
+                    && let Some(block_size) = source.block_size()
                 {
                     self.block_size = block_size;
                     debug!("Set block_size={}", self.block_size,);
                 }
 
                 // DSD rate from container sample_rate if valid (2.8224MHz → 1, 5.6448MHz → 2)
-                if let Some(sample_rate) = my_dsd.sample_rate() {
+                if let Some(sample_rate) = source.sample_rate() {
                     if sample_rate % DSD_64_RATE == 0 {
                         self.dsd_rate =
                             (sample_rate / DSD_64_RATE).try_into()?;
@@ -461,9 +458,7 @@ impl DsdReader {
                     self.interleaved,
                 );
 
-                let (source, file) = my_dsd.into_parts();
-                self.source = source;
-                self.file = file;
+                self.source = Some(source);
             }
             Err(e) if dsd_file_format != DsdFileFormat::Raw => {
                 info!("Container open failed with error: {}", e);
@@ -785,31 +780,14 @@ impl DsdIter {
             ));
             return Ok(());
         }
-        // Container sources hand back a reader already positioned at the
-        // start of their audio data.
-        if let Some(source) = &dsd_input.source {
-            self.reader = Box::new(BufReader::with_capacity(
-                self.frame_size as usize * 8,
-                source
-                    .reader()
-                    .map_err(|e| -> Box<dyn Error> { e })?,
-            ));
-            return Ok(());
-        }
-        // Raw input has no header, so reading always starts at byte 0.
-        let file = dsd_input
-            .file
-            .as_ref()
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    "Missing input file handle",
-                )
-            })?
-            .try_clone()?;
+        // Every non-stdin input (container or raw) is a DsdSource, already
+        // positioned at the start of its audio data.
+        let source = dsd_input.source.as_ref().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "Missing input source")
+        })?;
         self.reader = Box::new(BufReader::with_capacity(
             self.frame_size as usize * 8,
-            file,
+            source.reader().map_err(|e| -> Box<dyn Error> { e })?,
         ));
         Ok(())
     }

@@ -11,8 +11,9 @@ keywords = ["audio", "dsd", "dsf", "dff", "decoder"]
 categories = ["multimedia", "parsing"]
 
 [dependencies]
-dsf-meta = "0.2.8"
-dff-meta = "0.1.6"
-dsd-source = "0.1.0"
+# TEMP local-dev overrides, revert to version pins before publishing
+dsf-meta = { path = "../../gitlab/dsf_meta" }
+dff-meta = { path = "../dff" }
+dsd-source = { path = "../dsd-source" }
 log = { version = "0.4.28", features = ["std"] }
 id3 = "1.16.3"
