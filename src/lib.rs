@@ -121,7 +121,6 @@ const DSD_SILENCE: u8 = 0x69; // The byte value used to fill channel buffers whe
 
 struct InputPathAttrs {
     std_in: bool,
-    file_format: Option<DsdFileFormat>,
     parent_path: Option<PathBuf>,
     file_name: OsString,
 }
@@ -140,7 +139,6 @@ pub struct DsdReader {
     lsbit_first: bool,
     interleaved: bool,
     source: Option<Box<dyn DsdSource>>,
-    file_format: Option<DsdFileFormat>,
 }
 impl Default for DsdReader {
     fn default() -> Self {
@@ -157,7 +155,6 @@ impl Default for DsdReader {
             lsbit_first: false,
             interleaved: true,
             source: None,
-            file_format: None,
         }
     }
 }
@@ -242,7 +239,6 @@ impl DsdReader {
             source: None,
             tag: None,
             file_name: path_attrs.file_name,
-            file_format: path_attrs.file_format,
         };
 
         debug!("Set block_size={}", ctx.block_size);
@@ -280,11 +276,10 @@ impl DsdReader {
         ctx.std_in = false;
         ctx.parent_path = parent_path;
         ctx.file_name = file_name;
-        ctx.file_format = Some(file_format);
 
         debug!("Set block_size={}", ctx.block_size);
 
-        ctx.update_from_file(file_format)?;
+        ctx.update_from_file()?;
 
         Ok(ctx)
     }
@@ -325,7 +320,6 @@ impl DsdReader {
             if p.is_dir() {
                 return Err("Input path cannot be a directory".into());
             }
-            let file_format = Some(DsdFileFormat::from(p));
             let parent_path =
                 Some(p.parent().unwrap_or(Path::new("")).to_path_buf());
             let file_name = p
@@ -335,14 +329,12 @@ impl DsdReader {
 
             Ok(InputPathAttrs {
                 std_in: false,
-                file_format,
                 parent_path,
                 file_name,
             })
         } else {
             Ok(InputPathAttrs {
                 std_in: true,
-                file_format: None,
                 parent_path: None,
                 file_name: OsString::from("stdin"),
             })
@@ -352,10 +344,8 @@ impl DsdReader {
     fn init(&mut self) -> Result<(), Box<dyn Error>> {
         if self.std_in {
             self.debug_stdin();
-        } else if let Some(format) = self.file_format {
-            self.update_from_file(format)?;
         } else {
-            return Err("No valid input specified".into());
+            self.update_from_file()?;
         }
 
         Ok(())
@@ -375,10 +365,7 @@ impl DsdReader {
         );
     }
 
-    fn update_from_file(
-        &mut self,
-        dsd_file_format: DsdFileFormat,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn update_from_file(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let Some(path) = &self.in_path else {
             return Err("No readable input file".into());
         };
@@ -388,87 +375,74 @@ impl DsdReader {
             "Parent path: {}",
             self.parent_path.as_ref().unwrap().display()
         );
-        match open_source(path, dsd_file_format) {
-            Ok(source) => {
-                let file_len = std::fs::metadata(path)?.len();
-                debug!("File size: {} bytes", file_len);
+        let source = open_source(path)?;
+        let file_len = std::fs::metadata(path)?.len();
+        debug!("File size: {} bytes", file_len);
 
-                self.tag = source.tag();
+        self.tag = source.tag();
 
-                // Clamp audio_length to what the file can actually contain
-                let data_offset = source.data_offset().unwrap_or(0);
-                let max_len: u64 = file_len.saturating_sub(data_offset);
-                let reported_audio_length = source.audio_length().unwrap_or(0);
-                self.audio_length = if reported_audio_length > 0 && reported_audio_length <= max_len
-                {
-                    reported_audio_length
-                } else {
-                    max_len
-                };
+        // Clamp audio_length to what the file can actually contain
+        let data_offset = source.data_offset().unwrap_or(0);
+        let max_len: u64 = file_len.saturating_sub(data_offset);
+        let reported_audio_length = source.audio_length().unwrap_or(0);
+        self.audio_length = if reported_audio_length > 0 && reported_audio_length <= max_len {
+            reported_audio_length
+        } else {
+            max_len
+        };
 
-                // Channels from container (fallback to CLI on nonsense)
-                if let Some(chans_num) = source.channels() {
-                    self.channels_num = chans_num;
-                }
+        // Channels from container (fallback to CLI on nonsense)
+        if let Some(chans_num) = source.channels() {
+            self.channels_num = chans_num;
+        }
 
-                // Bit order from container
-                if let Some(endianness) = source.endianness() {
-                    self.lsbit_first = endianness == Endianness::LsbFirst;
-                }
+        // Bit order from container
+        if let Some(endianness) = source.endianness() {
+            self.lsbit_first = endianness == Endianness::LsbFirst;
+        }
 
-                // Channel layout from container. Format-agnostic: driven
-                // entirely by what the DsdSource reports, not by which
-                // concrete container format it is.
-                if let Some(layout) = source.layout() {
-                    self.interleaved = matches!(layout, FmtType::Interleaved);
-                }
+        // Channel layout from container. Format-agnostic: driven
+        // entirely by what the DsdSource reports, not by which
+        // concrete container format it is.
+        if let Some(layout) = source.layout() {
+            self.interleaved = matches!(layout, FmtType::Interleaved);
+        }
 
-                // Block size from container. Planar containers (e.g. DSF)
-                // have a meaningful per-channel block size, which we treat
-                // as authoritative. Interleaved containers (e.g. DFF) have
-                // no real block structure, so we keep the user-supplied or
-                // default block size, which just governs how many bytes we
-                // read at a time.
-                if let Some(FmtType::Planar) = source.layout()
-                    && let Some(block_size) = source.block_size()
-                {
-                    self.block_size = block_size;
-                    debug!("Set block_size={}", self.block_size,);
-                }
+        // Block size from container. Planar containers (e.g. DSF)
+        // have a meaningful per-channel block size, which we treat
+        // as authoritative. Interleaved containers (e.g. DFF) have
+        // no real block structure, so we keep the user-supplied or
+        // default block size, which just governs how many bytes we
+        // read at a time.
+        if let Some(FmtType::Planar) = source.layout()
+            && let Some(block_size) = source.block_size()
+        {
+            self.block_size = block_size;
+            debug!("Set block_size={}", self.block_size,);
+        }
 
-                // DSD rate from container sample_rate if valid (2.8224MHz → 1, 5.6448MHz → 2)
-                if let Some(sample_rate) = source.sample_rate() {
-                    if sample_rate % DSD_64_RATE == 0 {
-                        self.dsd_rate =
-                            (sample_rate / DSD_64_RATE).try_into()?;
-                    } else {
-                        // Fallback: keep CLI value (avoid triggering “Invalid DSD rate”)
-                        info!(
-                            "Container sample_rate {} not standard; keeping CLI dsd_rate={}",
-                            sample_rate, self.dsd_rate as i32
-                        );
-                    }
-                }
-
-                debug!("Audio length in bytes: {}", self.audio_length);
-                debug!(
-                    "Container: sr={}Hz channels={} interleaved={}",
-                    self.dsd_rate as u32 * DSD_64_RATE,
-                    self.channels_num,
-                    self.interleaved,
+        // DSD rate from container sample_rate if valid (2.8224MHz → 1, 5.6448MHz → 2)
+        if let Some(sample_rate) = source.sample_rate() {
+            if sample_rate % DSD_64_RATE == 0 {
+                self.dsd_rate = (sample_rate / DSD_64_RATE).try_into()?;
+            } else {
+                // Fallback: keep CLI value (avoid triggering “Invalid DSD rate”)
+                info!(
+                    "Container sample_rate {} not standard; keeping CLI dsd_rate={}",
+                    sample_rate, self.dsd_rate as i32
                 );
-
-                self.source = Some(source);
-            }
-            Err(e) if dsd_file_format != DsdFileFormat::Raw => {
-                info!("Container open failed with error: {}", e);
-                info!("Treating input as raw DSD (no container)");
-                self.update_from_file(DsdFileFormat::Raw)?;
-            }
-            Err(e) => {
-                return Err(e);
             }
         }
+
+        debug!("Audio length in bytes: {}", self.audio_length);
+        debug!(
+            "Container: sr={}Hz channels={} interleaved={}",
+            self.dsd_rate as u32 * DSD_64_RATE,
+            self.channels_num,
+            self.interleaved,
+        );
+
+        self.source = Some(source);
         Ok(())
     }
 }
