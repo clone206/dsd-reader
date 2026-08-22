@@ -1,6 +1,3 @@
-[submodule "vendor/dsd-source"]
-	path = vendor/dsd-source
-	url = https://github.com/clone206/dsd-source.git
 [submodule "vendor/dff"]
 	path = vendor/dff
 	url = https://github.com/clone206/dff.git

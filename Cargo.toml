@@ -13,9 +13,6 @@ categories = ["multimedia", "parsing"]
 [dependencies]
 dsf-meta = { path = "vendor/dsf_meta" }
 dff-meta = { path = "vendor/dff" }
-# dff-meta's Cargo.toml depends on `dsd-source = { path = "../dsd-source" }`,
-# which (via vendor/dff's nesting) resolves to this same vendor/dsd-source
-# directory, so both crates share one dsd-source instance.
-dsd-source = { path = "vendor/dsd-source" }
+dsd-source = "0.1.0"
 log = { version = "0.4.28", features = ["std"] }
 id3 = "1.16.3"
